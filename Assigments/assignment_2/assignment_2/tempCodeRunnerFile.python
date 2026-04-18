@@ -1,0 +1,132 @@
+import pandas
+from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.pyplot import title
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_curve, auc
+import matplotlib.pyplot as plt
+
+
+
+######################################| read the data |############################################################
+
+data = pandas.read_csv("customer_data.csv")
+
+######################################| Handling Missing Data |############################################################
+
+data['Age'] = data['Age'].fillna(data['Age'].median())
+data['Tenure'] = data['Tenure'].fillna(data['Tenure'].median())
+data['SupportCalls'] = data['SupportCalls'].fillna(data['SupportCalls'].median())
+data['Income'] = data.groupby('ProductType')['Income'].transform(lambda x: x.fillna(x.median()))
+
+######################################| Clean Data from outlier |############################################################
+
+for col in ['Age', 'Tenure', 'SupportCalls','Income']:
+    Q1 = data[col].quantile(0.25)
+    Q3 = data[col].quantile(0.75)
+    IQR = Q3- Q1
+    lowerBound = Q1 - 1.5 * IQR
+    upperBound = Q3 + 1.5 * IQR
+    medianValue = data[col].median()
+    data[col] =data[col].apply(lambda x: medianValue if x < lowerBound or x > upperBound else x) # we change the outlier by median of column instead of remove all row
+
+######################################| Scaling (Min-Max Normalization) |############################################################
+
+for col in ['Age', 'Tenure', 'SupportCalls','Income']:
+    minv = data[col].min()
+    maxv = data[col].max()
+    data[col] = (data[col]-minv)/(maxv-minv)
+
+'''
+------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------
+'''
+
+
+X = data.drop(["ChurnStatus", "CustomerID"], axis=1) # this mean thee data without ChurnStatus is input , axis =1 mean we remove colums / axis =0 mean rows
+y = data["ChurnStatus"] # ChurnStatus is the target value 
+
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, train_size=2500, random_state=42, shuffle=True)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, train_size=500, random_state=42, shuffle=True)
+'''
+above we split the data to 2500 training samples, 500 validation samples, and 500 test samples. 
+'''
+
+
+#-------
+
+
+
+def evaluate(model, X_train, y_train, X_val, y_val, X_test, y_test):
+    results = {}
+    y_pred_train = model.predict(X_train)
+    y_pred_val = model.predict(X_val)
+    y_pred_test = model.predict(X_test)
+    
+    results["Accuracy_Train"] = accuracy_score(y_train, y_pred_train)
+    results["Accuracy_Val"] = accuracy_score(y_val, y_pred_val)
+    results["Accuracy_Test"] = accuracy_score(y_test, y_pred_test)
+    
+    results["Precision_Train"] = precision_score(y_train, y_pred_train)
+    results["Precision_Val"] = precision_score(y_val, y_pred_val)
+    results["Precision_Test"] = precision_score(y_test, y_pred_test)
+    
+    results["Recall_Train"] = recall_score(y_train, y_pred_train)
+    results["Recall_Val"] = recall_score(y_val, y_pred_val)
+    results["Recall_Test"] = recall_score(y_test, y_pred_test)
+    
+    return results
+
+
+
+model_linear = LogisticRegression(max_iter=500)
+model_linear.fit(X_train, y_train)
+metrics_linear = evaluate(model_linear, X_train, y_train, X_val, y_val, X_test, y_test)
+
+
+
+degrees = [2, 5, 9]
+metrics_poly = {}
+models_poly  = {}
+
+for d in degrees:
+    poly = PolynomialFeatures(d)
+    X_train_p = poly.fit_transform(X_train)
+    X_val_p = poly.transform(X_val)
+    X_test_p = poly.transform(X_test)
+    
+    model = LogisticRegression(max_iter=2000)
+    model.fit(X_train_p, y_train)
+    models_poly[d] = (model, poly)
+    metrics_poly[d] = evaluate(model, X_train_p, y_train, X_val_p, y_val, X_test_p, y_test)
+
+
+
+
+best_degree = max(metrics_poly, key=lambda d: metrics_poly[d]["Accuracy_Val"])
+best_model, best_poly = models_poly[best_degree]
+
+print("\nBest Model Degree =", best_degree)
+print(metrics_poly[best_degree])
+
+
+
+
+X_test_best = best_poly.transform(X_test)
+
+y_scores = best_model.predict_proba(X_test_best)[:, 1]
+fpr, tpr, _ = roc_curve(y_test, y_scores)
+roc_auc = auc(fpr, tpr)
+
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.3f}", linewidth=2)
+plt.plot([0,1], [0,1], "--", color="gray")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title(f"ROC Curve – Logistic Regression (Degree {best_degree})")
+plt.legend()
+plt.grid()
+plt.show()

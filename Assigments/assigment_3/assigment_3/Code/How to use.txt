@@ -1,0 +1,28 @@
+######################################################################################################################
+Preprocessing :-
+1_ run Preprocessing.py file to produce "good_rows_unique.csv" (( can use for TimeOfDay ))
+2_ we make a manual edit to produce "good_rows_unique_final.csv" (( can use for TimeOfDay ))
+3_ run image_download.py to produce "good_rows_local.csv" (( use for Season ))
+
+######################################################################################################################
+
+predict time of day from description:- 
+
+1_ run preprocessing (it will produce a "good_rows_unique.csv")
+2_ run TimeFromDesc
+Note: After we run TimeFromDesc if we use "good_rows_unique.csv" all data that still have problem will discard and we will generate a new csv file named "cleaned_timeofday_dataset.csv"
+so if we have to see all data use "good_rows_unique_final.csv" because this file has been extra modified by hand without ignore any data.
+
+######################################################################################################################
+predict season form image:-
+
+1_ run preprocessing then manual edit then image_download 
+2_ or start with image_download using "good_rows_unique_final.csv" to produce "good_rows_local.csv" (( linke the downloaded image with local url ))
+3_ run season.py 
+Note : Device selection was handled using: cuda if available else cpu at ResNet18 CNN.
+######################################################################################################################
+EDA : 
+1_ run preprocessing then manual edit 
+2_ or using "good_rows_unique_final.csv" 
+3_ run EDA.py
+
